@@ -9,6 +9,7 @@ STATE_FILE="/var/services/homes/agent/.cm-watchdog.state"
 LOCK_FILE="/var/services/homes/agent/.cm-watchdog.lock"
 STILL_DOWN_REMINDER_SECS=1800   # 30 min between repeat "still down" alerts
 SYNOPKG=/usr/syno/bin/synopkg
+DOCKER=/var/packages/ContainerManager/target/usr/bin/docker
 
 exec 200>"$LOCK_FILE"
 flock -n 200 || exit 0   # a previous run is still in flight, skip this tick
@@ -53,13 +54,27 @@ notify_incident_detected() {
 }
 
 current_status() {
-    "$SYNOPKG" status ContainerManager 2>/dev/null | grep -o '"status":"[a-z]*"' | head -1 | cut -d'"' -f4
+    # Ground truth is a functional probe, not synopkg's own status wrapper --
+    # `synopkg status ContainerManager` has been observed to flap between
+    # "stop"/"starting" for its own internal reasons even while dockerd has
+    # been running fine, uninterrupted, for hours (containers all healthy).
+    # Trusting that field directly caused a false-positive restart trigger
+    # during testing. `docker info` actually talking to the daemon is the
+    # real signal.
+    if "$DOCKER" info >/dev/null 2>&1; then
+        echo "running"
+    else
+        echo "down"
+    fi
+}
+
+synopkg_detail() {
+    "$SYNOPKG" status ContainerManager 2>/dev/null
 }
 
 now() { date +%s; }
 
 STATUS="$(current_status)"
-[ -z "$STATUS" ] && STATUS="stop"   # treat unparseable output as down, safest default
 
 if [ "$STATUS" = "running" ]; then
     if [ "$LAST_STATUS" != "running" ] && [ -n "$INCIDENT_ID" ]; then
@@ -81,7 +96,7 @@ if [ "$LAST_STATUS" = "running" ] || [ -z "$INCIDENT_ID" ]; then
     INCIDENT_ID="$(now)"
     LAST_ALERT_TS="$(now)"
     notify "⚠️ ContainerManager down on NAS" \
-        "Detected status=${STATUS}. Attempting auto-restart (incident ${INCIDENT_ID})." \
+        "docker info failed. synopkg says: $(synopkg_detail). Attempting auto-restart (incident ${INCIDENT_ID})." \
         "warning" "high"
     notify_incident_detected "$INCIDENT_ID"
     "$SYNOPKG" start ContainerManager >/dev/null 2>&1 &
