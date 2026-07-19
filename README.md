@@ -1,5 +1,7 @@
 # homelab-ops
 
+[![CI](https://github.com/preston-bernstein/homelab-ops/actions/workflows/ci.yml/badge.svg)](https://github.com/preston-bernstein/homelab-ops/actions/workflows/ci.yml)  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Watchdog + auto-triage pipeline for the household infra (NAS + desktop). Scoped
 deliberately narrow: **scripts, runbooks, and incident reports only** — never
 NAS docker-compose files or credentials. That keeps this repo safe to have a
@@ -39,3 +41,7 @@ on the box if it needs to change.
 ntfy topic `<ntfy-topic>` on the existing `internal-finance-service-ntfy-1` container,
 `http://nas.example.internal:8090/<ntfy-topic>`. Subscribe the ntfy app to that topic to
 get pushes.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
