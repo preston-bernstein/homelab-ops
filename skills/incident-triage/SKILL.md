@@ -30,10 +30,13 @@ live action is genuinely needed, say so in the report; don't take it.
 ## Inputs
 
 You'll be given an incident id (a unix timestamp) and should already know
-from that timestamp roughly when to look. Confirm the ntfy message for this
-incident id (`curl -s http://nas.example.internal:8090/<ntfy-topic>/json?tags=incident-detected`)
-to get the exact detection time and current state (restored / still down)
-before investigating further.
+from that timestamp roughly when to look. `NTFY_URL` must be set in your
+environment (see `.env.example` at the repo root -- this is provisioned on
+the desktop where this skill runs, not something you configure). Confirm
+the ntfy message for this incident id
+(`curl -s "${NTFY_URL}/json?tags=incident-detected"`) to get the exact
+detection time and current state (restored / still down) before
+investigating further.
 
 ## Investigation checklist
 
@@ -64,23 +67,50 @@ Work through these in order, on `nas.example.internal`:
 
 Known prior incidents (context, not exhaustive — check
 `homelab-ops/incidents/` in this repo for the full history before writing
-this one up, and reference cross-cutting patterns if you see a repeat):
-- 2026-07-11: OOM crash, root cause was ContainerManager starting all ~35
-  containers simultaneously on an 8GB NAS with no per-container memory
-  limits.
-- 2026-07-17: Watchdog auto-stop after 5 days of healthy uptime, no OOM, no
-  disk-full — cause unconfirmed beyond the watchdog's own "abnormal status"
-  determination; NAS's journald had already rotated past the event by the
-  time it was investigated (~40 min later), which is part of why this
-  skill leads with `/var/log/synopkg.log` instead.
+this one up, and reference cross-cutting patterns if you see a repeat).
+These are deliberately written at the same generic level you must write
+your own report at — see Redaction below before you add to this list or
+write incidents/*.md:
+- 2026-07-11: OOM crash, root cause was ContainerManager starting most of
+  the NAS's containers simultaneously with no per-container memory limits
+  on a capacity-constrained NAS.
+- 2026-07-17: Watchdog auto-stop after several days of healthy uptime, no
+  OOM, no disk-full — cause unconfirmed beyond the watchdog's own "abnormal
+  status" determination; the NAS's journald had already rotated past the
+  event by the time it was investigated (tens of minutes later), which is
+  part of why this skill leads with `/var/log/synopkg.log` instead.
+
+## Redaction (required, before anything below is written or posted)
+
+This repo is public and you are opening a PR into it unattended — nobody
+reviews your draft before it becomes a public commit. Before writing
+`incidents/*.md`, the PR body, or the ntfy notification in step 4:
+
+- Draft the report normally, using whatever you learned from SSH (real
+  hostnames/IPs are fine to *reason about* while investigating — the
+  constraint is on what gets written down).
+- Pipe the finished draft through the redaction generator:
+  `skills/incident-triage/scripts/redact.sh < draft.md > clean.md`. This
+  strips literal RFC1918 addresses (`10.x`, `172.16-31.x`, `192.168.x`)
+  automatically — treat it as the floor, not the whole job.
+- On top of what the script catches, write the report itself at the same
+  generic level as the "Known prior incidents" entries above: say "the NAS"
+  / "the desktop", not a hostname-as-IP; describe capacity qualitatively
+  ("a capacity-constrained NAS", "most of the NAS's containers") rather than
+  exact RAM/disk/container-count figures; container names are fine (they're
+  software, not infra topology) but don't combine them with exact resource
+  numbers in a way that reconstructs the real deployment.
+- If you are unsure whether a detail is safe to publish, leave it out and
+  say in the report that you omitted it for that reason — an incomplete
+  report is fine; a public infra leak is not.
 
 ## Output
 
-1. Write `incidents/<incident_id>-<short-slug>.md` in this repo: timeline,
-   root cause (or best-supported hypothesis if not fully confirmed — say
-   which it is), what recovered on its own vs needed intervention, and any
-   hardening you'd propose (e.g., RAM upgrade still pending from the
-   2026-07-11 incident, per-container memory limits, journald buffer size
+1. Write the redacted report to `incidents/<incident_id>-<short-slug>.md` in
+   this repo: timeline, root cause (or best-supported hypothesis if not
+   fully confirmed — say which it is), what recovered on its own vs needed
+   intervention, and any hardening you'd propose (e.g., a still-pending
+   capacity upgrade, per-container memory limits, journald buffer size
    increase so future investigations aren't working blind).
 2. If you have a concrete, low-risk hardening change to propose (e.g. a
    tweak to `cm-watchdog.sh`'s debounce timing, a documentation fix), include
@@ -88,11 +118,13 @@ this one up, and reference cross-cutting patterns if you see a repeat):
    files or credentials — those are out of scope for this repo by design.
 3. Commit to a new branch (`incident/<incident_id>`), push, and
    `gh pr create` with a title like `Incident <incident_id>: <one-line root
-   cause>` and the report as the PR body.
-4. Post the final ntfy notification yourself:
+   cause>` and the *redacted* report as the PR body.
+4. Post the final ntfy notification yourself (this text is short and
+   PR-URL-only, but redact it too — never paste raw investigation output
+   into a notification):
    ```
    curl -s -H "Title: Incident report ready" -H "Tags: clipboard" \
-     -d "<PR URL> — review when you can" http://nas.example.internal:8090/<ntfy-topic>
+     -d "<PR URL> — review when you can" "${NTFY_URL}"
    ```
 
 If you get through the checklist and still can't determine a root cause,

@@ -1,5 +1,7 @@
 # homelab-ops
 
+[![CI](https://github.com/preston-bernstein/homelab-ops/actions/workflows/ci.yml/badge.svg)](https://github.com/preston-bernstein/homelab-ops/actions/workflows/ci.yml)  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Watchdog + auto-triage pipeline for the household infra (NAS + desktop). Scoped
 deliberately narrow: **scripts, runbooks, and incident reports only** — never
 NAS docker-compose files or credentials. That keeps this repo safe to have a
@@ -36,6 +38,22 @@ on the box if it needs to change.
 
 ## Notification channel
 
-ntfy topic `<ntfy-topic>` on the existing `internal-finance-service-ntfy-1` container,
-`http://nas.example.internal:8090/<ntfy-topic>`. Subscribe the ntfy app to that topic to
-get pushes.
+Both halves read a single `NTFY_URL` (a push URL for your own ntfy topic)
+from the environment, with a safe loopback default
+(`http://127.0.0.1:8080/homelab-ops`) so cloning this repo never silently
+points anything at Preston's real infra. Copy `.env.example` to `.env`
+(gitignored) and set the real value before deploying:
+
+- `watchdog/cm-watchdog.sh` sources an optional `.env` next to itself on the
+  NAS, or picks up `NTFY_URL` from cron's environment directly.
+- `skills/incident-triage/` expects `NTFY_URL` set in the desktop
+  environment the skill runs in.
+
+ntfy has no built-in auth — anyone who knows a topic's URL can read and
+publish to it — so treat the topic name as a shared secret and don't reuse
+one that has ever appeared in a public repo or PR. Subscribe the ntfy app
+to your topic to get pushes.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
