@@ -4,7 +4,17 @@
 # 5 minutes on the NAS. See ../README.md for the full pipeline this feeds.
 set -u
 
-NTFY_URL="http://10.0.0.250:8090/nas-infra"
+# NTFY_URL is env-driven with a safe loopback default, never a hardcoded LAN
+# address: this script is cloned by anyone who clones the repo, and a
+# hardcoded address would silently point their box at Preston's infra (or,
+# before this fix, expose it). Real deployments set NTFY_URL either via the
+# environment cron already carries, or an untracked `.env` file next to this
+# script (see .env.example at the repo root) -- both approaches keep the
+# actual value out of git.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck disable=SC1091
+[ -f "$SCRIPT_DIR/.env" ] && source "$SCRIPT_DIR/.env"
+NTFY_URL="${NTFY_URL:-http://127.0.0.1:8080/homelab-ops}"
 STATE_FILE="/var/services/homes/agent/.cm-watchdog.state"
 LOCK_FILE="/var/services/homes/agent/.cm-watchdog.lock"
 STILL_DOWN_REMINDER_SECS=1800   # 30 min between repeat "still down" alerts
