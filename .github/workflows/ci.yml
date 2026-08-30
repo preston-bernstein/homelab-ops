@@ -1,23 +1,26 @@
 name: CI
+
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
-jobs:
-  shellcheck:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: ShellCheck
-        uses: ludeeus/action-shellcheck@2.0.0
 
-  no-host-identifiers:
-    # Guards blocker #3 from the public-readiness audit: skills/incident-triage
-    # opens PRs into this repo unattended, so every PR -- including a future
-    # bot-generated incident report -- must pass this before merge.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: No RFC1918 addresses in scripts or generated report output
-        run: bash tests/test_no_host_identifiers.sh
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: preston-bernstein/ci-workflows/.github/workflows/shell.yml@v1
+    with:
+      # skills/incident-triage opens PRs into this repo unattended, so every PR
+      # -- including a future bot-generated incident report -- must pass this.
+      checks: |
+        bash tests/test_no_host_identifiers.sh
+
+  workflows:
+    uses: preston-bernstein/ci-workflows/.github/workflows/actions-lint.yml@v1
