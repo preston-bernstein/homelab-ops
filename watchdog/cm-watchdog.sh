@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# sh-allow: nostrict legacy script with no bats test yet; strict mode would change its error handling
 # Detects Synology ContainerManager going down, attempts an auto-restart,
 # and notifies ntfy at every state transition. Runs as root via cron every
 # 5 minutes on the NAS. See ../README.md for the full pipeline this feeds.
@@ -17,12 +18,12 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 NTFY_URL="${NTFY_URL:-http://127.0.0.1:8080/homelab-ops}"
 STATE_FILE="/var/services/homes/agent/.cm-watchdog.state"
 LOCK_FILE="/var/services/homes/agent/.cm-watchdog.lock"
-STILL_DOWN_REMINDER_SECS=1800   # 30 min between repeat "still down" alerts
+STILL_DOWN_REMINDER_SECS=1800 # 30 min between repeat "still down" alerts
 SYNOPKG=/usr/syno/bin/synopkg
 DOCKER=/var/packages/ContainerManager/target/usr/bin/docker
 
 exec 200>"$LOCK_FILE"
-flock -n 200 || exit 0   # a previous run is still in flight, skip this tick
+flock -n 200 || exit 0 # a previous run is still in flight, skip this tick
 
 # --- state ---
 LAST_STATUS="unknown"
@@ -33,7 +34,7 @@ RESTART_ATTEMPTED=0
 [ -f "$STATE_FILE" ] && source "$STATE_FILE"
 
 save_state() {
-    cat > "$STATE_FILE" <<EOF
+  cat >"$STATE_FILE" <<EOF
 LAST_STATUS="$LAST_STATUS"
 INCIDENT_ID="$INCIDENT_ID"
 LAST_ALERT_TS=$LAST_ALERT_TS
@@ -42,44 +43,44 @@ EOF
 }
 
 notify() {
-    # notify TITLE MESSAGE TAGS [PRIORITY]
-    local title="$1" message="$2" tags="$3" priority="${4:-default}"
-    curl -sS -m 10 \
-        -H "Title: ${title}" \
-        -H "Tags: ${tags}" \
-        -H "Priority: ${priority}" \
-        -d "${message}" \
-        "$NTFY_URL" >/dev/null 2>&1
+  # notify TITLE MESSAGE TAGS [PRIORITY]
+  local title="$1" message="$2" tags="$3" priority="${4:-default}"
+  curl -sS -m 10 \
+    -H "Title: ${title}" \
+    -H "Tags: ${tags}" \
+    -H "Priority: ${priority}" \
+    -d "${message}" \
+    "$NTFY_URL" >/dev/null 2>&1
 }
 
 notify_incident_detected() {
-    # Machine-readable trigger the desktop poller filters on via ?tags=incident-detected.
-    local incident_id="$1"
-    curl -sS -m 10 \
-        -H "Title: ContainerManager incident $incident_id" \
-        -H "Tags: incident-detected" \
-        -H "Priority: high" \
-        -d "{\"event\":\"incident-detected\",\"incident_id\":\"${incident_id}\",\"host\":\"nas\",\"summary\":\"ContainerManager auto-stopped, restart attempted\"}" \
-        "$NTFY_URL" >/dev/null 2>&1
+  # Machine-readable trigger the desktop poller filters on via ?tags=incident-detected.
+  local incident_id="$1"
+  curl -sS -m 10 \
+    -H "Title: ContainerManager incident $incident_id" \
+    -H "Tags: incident-detected" \
+    -H "Priority: high" \
+    -d "{\"event\":\"incident-detected\",\"incident_id\":\"${incident_id}\",\"host\":\"nas\",\"summary\":\"ContainerManager auto-stopped, restart attempted\"}" \
+    "$NTFY_URL" >/dev/null 2>&1
 }
 
 current_status() {
-    # Ground truth is a functional probe, not synopkg's own status wrapper --
-    # `synopkg status ContainerManager` has been observed to flap between
-    # "stop"/"starting" for its own internal reasons even while dockerd has
-    # been running fine, uninterrupted, for hours (containers all healthy).
-    # Trusting that field directly caused a false-positive restart trigger
-    # during testing. `docker info` actually talking to the daemon is the
-    # real signal.
-    if "$DOCKER" info >/dev/null 2>&1; then
-        echo "running"
-    else
-        echo "down"
-    fi
+  # Ground truth is a functional probe, not synopkg's own status wrapper --
+  # `synopkg status ContainerManager` has been observed to flap between
+  # "stop"/"starting" for its own internal reasons even while dockerd has
+  # been running fine, uninterrupted, for hours (containers all healthy).
+  # Trusting that field directly caused a false-positive restart trigger
+  # during testing. `docker info` actually talking to the daemon is the
+  # real signal.
+  if "$DOCKER" info >/dev/null 2>&1; then
+    echo "running"
+  else
+    echo "down"
+  fi
 }
 
 synopkg_detail() {
-    "$SYNOPKG" status ContainerManager 2>/dev/null
+  "$SYNOPKG" status ContainerManager 2>/dev/null
 }
 
 now() { date +%s; }
@@ -87,43 +88,43 @@ now() { date +%s; }
 STATUS="$(current_status)"
 
 if [ "$STATUS" = "running" ]; then
-    if [ "$LAST_STATUS" != "running" ] && [ -n "$INCIDENT_ID" ]; then
-        notify "✅ ContainerManager restored" \
-            "Back up after incident ${INCIDENT_ID}." \
-            "white_check_mark"
-    fi
-    LAST_STATUS="running"
-    INCIDENT_ID=""
-    RESTART_ATTEMPTED=0
-    LAST_ALERT_TS=0
-    save_state
-    exit 0
+  if [ "$LAST_STATUS" != "running" ] && [ -n "$INCIDENT_ID" ]; then
+    notify "✅ ContainerManager restored" \
+      "Back up after incident ${INCIDENT_ID}." \
+      "white_check_mark"
+  fi
+  LAST_STATUS="running"
+  INCIDENT_ID=""
+  RESTART_ATTEMPTED=0
+  LAST_ALERT_TS=0
+  save_state
+  exit 0
 fi
 
 # STATUS is down/starting/anything-not-running
 if [ "$LAST_STATUS" = "running" ] || [ -z "$INCIDENT_ID" ]; then
-    # fresh incident
-    INCIDENT_ID="$(now)"
-    LAST_ALERT_TS="$(now)"
-    notify "⚠️ ContainerManager down on NAS" \
-        "docker info failed. synopkg says: $(synopkg_detail). Attempting auto-restart (incident ${INCIDENT_ID})." \
-        "warning" "high"
-    notify_incident_detected "$INCIDENT_ID"
-    "$SYNOPKG" start ContainerManager >/dev/null 2>&1 &
-    disown
-    RESTART_ATTEMPTED=1
-    LAST_STATUS="$STATUS"
-    save_state
-    exit 0
+  # fresh incident
+  INCIDENT_ID="$(now)"
+  LAST_ALERT_TS="$(now)"
+  notify "⚠️ ContainerManager down on NAS" \
+    "docker info failed. synopkg says: $(synopkg_detail). Attempting auto-restart (incident ${INCIDENT_ID})." \
+    "warning" "high"
+  notify_incident_detected "$INCIDENT_ID"
+  "$SYNOPKG" start ContainerManager >/dev/null 2>&1 &
+  disown
+  RESTART_ATTEMPTED=1
+  LAST_STATUS="$STATUS"
+  save_state
+  exit 0
 fi
 
 # ongoing incident, still down — debounced reminder only
-ELAPSED=$(( $(now) - LAST_ALERT_TS ))
+ELAPSED=$(($(now) - LAST_ALERT_TS))
 if [ "$ELAPSED" -ge "$STILL_DOWN_REMINDER_SECS" ]; then
-    notify "❌ ContainerManager still down" \
-        "Incident ${INCIDENT_ID} still unresolved (status=${STATUS}). May need manual help." \
-        "x" "high"
-    LAST_ALERT_TS="$(now)"
+  notify "❌ ContainerManager still down" \
+    "Incident ${INCIDENT_ID} still unresolved (status=${STATUS}). May need manual help." \
+    "x" "high"
+  LAST_ALERT_TS="$(now)"
 fi
 LAST_STATUS="$STATUS"
 save_state

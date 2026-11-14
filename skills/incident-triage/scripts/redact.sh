@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Redacts host-identifying detail from incident-report text before it is
 # written to incidents/*.md, a PR body, or an ntfy notification.
 #
