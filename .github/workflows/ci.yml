@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   ci:
-    uses: preston-bernstein/ci-workflows/.github/workflows/shell.yml@v1
+    uses: preston-bernstein/ci-workflows/.github/workflows/shell.yml@980585f4e9c3c1ef982cb934e153f925121fe0c0 # v1
     with:
       # skills/incident-triage opens PRs into this repo unattended, so every PR
       # -- including a future bot-generated incident report -- must pass this.
@@ -24,4 +24,4 @@ jobs:
         bash tests/test_no_host_identifiers.sh
 
   workflows:
-    uses: preston-bernstein/ci-workflows/.github/workflows/actions-lint.yml@v1
+    uses: preston-bernstein/ci-workflows/.github/workflows/actions-lint.yml@980585f4e9c3c1ef982cb934e153f925121fe0c0 # v1
