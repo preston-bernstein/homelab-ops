@@ -1,4 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# sh-allow: nostrict legacy script with no bats test yet; strict mode would change its error handling
 # Regression test: this repo is public and skills/incident-triage's bot opens
 # PRs into it unattended. A literal RFC1918 (private-LAN) IPv4 address
 # anywhere in a tracked file -- or one that survives a pass through the
@@ -25,30 +26,30 @@ fail=0
 echo "== test A: no RFC1918 literal in any tracked file =="
 hits="$(git ls-files -z | xargs -0 grep -InE "$RFC1918" 2>/dev/null | grep -v '^tests/test_no_host_identifiers\.sh:' || true)"
 if [ -n "$hits" ]; then
-    echo "FAIL: literal RFC1918 address(es) found in tracked files:"
-    echo "$hits"
-    fail=1
+  echo "FAIL: literal RFC1918 address(es) found in tracked files:"
+  echo "$hits"
+  fail=1
 else
-    echo "PASS: no RFC1918 literal in tracked files"
+  echo "PASS: no RFC1918 literal in tracked files"
 fi
 
 echo
 echo "== test B: redaction generator strips RFC1918 addresses from report text =="
 REDACT="$REPO_ROOT/skills/incident-triage/scripts/redact.sh"
 if [ ! -x "$REDACT" ]; then
-    echo "FAIL: $REDACT missing or not executable"
-    fail=1
+  echo "FAIL: $REDACT missing or not executable"
+  fail=1
 else
-    sample="Incident detected on host nas.example.internal, restart posted to lan.example.internal and 172.20.0.4. ContainerManager back up."
-    out="$(printf '%s\n' "$sample" | "$REDACT")"
-    if echo "$out" | grep -qE "$RFC1918"; then
-        echo "FAIL: redact.sh left an RFC1918 address in its output:"
-        echo "$out"
-        fail=1
-    else
-        echo "PASS: redact.sh output is clean:"
-        echo "$out"
-    fi
+  sample="Incident detected on host nas.example.internal, restart posted to lan.example.internal and 172.20.0.4. ContainerManager back up."
+  out="$(printf '%s\n' "$sample" | "$REDACT")"
+  if echo "$out" | grep -qE "$RFC1918"; then
+    echo "FAIL: redact.sh left an RFC1918 address in its output:"
+    echo "$out"
+    fail=1
+  else
+    echo "PASS: redact.sh output is clean:"
+    echo "$out"
+  fi
 fi
 
 exit "$fail"
